@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jailbreak Detector — Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0e17; color: #c8d6e5; font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Cascadia Code', monospace; padding: 0; min-height: 100vh; }
+.container { max-width: 1280px; margin: 0 auto; padding: 24px; }
+/* Scan overlay */
+#scan-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0e17; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.8s ease; }
+#scan-overlay.fade-out { opacity: 0; pointer-events: none; }
+.scan-title { color: #3b82f6; font-size: 1.2rem; margin-bottom: 24px; letter-spacing: 2px; }
+.scan-progress { width: 320px; height: 2px; background: #1a2332; border-radius: 2px; overflow: hidden; margin-bottom: 12px; }
+.scan-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #3b82f6, #22c55e); border-radius: 2px; animation: scan-progress 3s ease-in-out forwards; }
+@keyframes scan-progress { 0% { width: 0%; } 30% { width: 25%; } 60% { width: 60%; } 85% { width: 85%; } 100% { width: 100%; } }
+.scan-steps { color: #64748b; font-size: 0.8rem; }
+.scan-step { margin: 2px 0; }
+.scan-step.done { color: #22c55e; }
+/* Header */
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #2a3a50; }
+.header h1 { font-size: 1.5rem; color: #e2e8f0; font-weight: 600; }
+.header .badge { background: #1a2332; color: #3b82f6; padding: 4px 12px; border-radius: 6px; font-size: 0.75rem; border: 1px solid #2a3a50; }
+.header .timestamp { color: #64748b; font-size: 0.75rem; }
+/* Stats row */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+.stat-card { background: #1a2332; border: 1px solid #2a3a50; border-radius: 12px; padding: 20px; text-align: center; }
+.stat-card .num { font-size: 2rem; font-weight: 700; margin-bottom: 4px; }
+.stat-card .label { color: #64748b; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; }
+.stat-card.blue .num { color: #3b82f6; }
+.stat-card.green .num { color: #22c55e; }
+.stat-card.yellow .num { color: #f59e0b; }
+.stat-card.red .num { color: #ef4444; }
+/* Pipeline */
+.pipeline { display: flex; align-items: center; justify-content: space-between; background: #1a2332; border: 1px solid #2a3a50; border-radius: 12px; padding: 16px 24px; margin-bottom: 32px; }
+.pipeline-step { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.pipeline-step .icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; background: #2a3a50; color: #64748b; }
+.pipeline-step.active .icon { background: #3b82f6; color: #fff; }
+.pipeline-step .plabel { font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+.pipeline-arrow { color: #2a3a50; font-size: 1rem; }
+/* Section titles */
+.section-title { font-size: 1rem; color: #e2e8f0; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #2a3a50; }
+/* Architecture + Doughnut row */
+.arch-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+.arch-card { background: #1a2332; border: 1px solid #2a3a50; border-radius: 12px; padding: 20px; }
+.arch-flow { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.arch-node { padding: 8px 12px; background: #0a0e17; border: 1px solid #2a3a50; border-radius: 6px; font-size: 0.75rem; color: #c8d6e5; display: flex; align-items: center; gap: 8px; }
+.arch-node .tag { background: #2a3a50; padding: 2px 8px; border-radius: 4px; font-size: 0.65rem; color: #64748b; }
+.arch-arrow { color: #2a3a50; font-size: 0.75rem; text-align: center; }
+.chart-container { position: relative; height: 260px; }
+/* Charts row */
+.charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+.chart-card { background: #1a2332; border: 1px solid #2a3a50; border-radius: 12px; padding: 20px; }
+.chart-card .chart-title { font-size: 0.8rem; color: #64748b; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+/* Findings table */
+.table-card { background: #1a2332; border: 1px solid #2a3a50; border-radius: 12px; padding: 20px; margin-bottom: 32px; }
+.filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.filter-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid #2a3a50; background: transparent; color: #64748b; font-family: inherit; font-size: 0.75rem; cursor: pointer; }
+.filter-btn.active { background: #2a3a50; color: #c8d6e5; }
+.filter-btn:hover { border-color: #3b82f6; color: #c8d6e5; }
+table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+th { text-align: left; padding: 10px 8px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #2a3a50; }
+td { padding: 8px; border-bottom: 1px solid #1a2332; color: #c8d6e5; }
+tr:hover td { background: rgba(59, 130, 246, 0.05); }
+.sev-tag { padding: 2px 8px; border-radius: 4px; font-size: 0.65rem; }
+.sev-HIGH { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+.sev-MEDIUM { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+.sev-LOW { background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); }
+.findings-count { color: #64748b; font-size: 0.7rem; }
+.evidence-cell { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Footer */
+.footer { text-align: center; padding: 24px; color: #2a3a50; font-size: 0.7rem; border-top: 1px solid #1a2332; }
+</style>
+</head>
+<body>
+
+<div id="scan-overlay">
+  <div class="scan-title">JAILBREAK DETECTOR</div>
+  <div class="scan-progress"><div class="scan-bar"></div></div>
+  <div class="scan-steps">
+    <div class="scan-step done">[OK] Loading corpus (26 files)...</div>
+    <div class="scan-step done">[OK] Running regex patterns...</div>
+    <div class="scan-step done">[OK] Analyzing entropy...</div>
+    <div class="scan-step done">[OK] Structural analysis...</div>
+    <div class="scan-step done">[OK] Scoring results...</div>
+  </div>
+</div>
+
+<div class="container">
+
+<div class="header">
+  <div>
+    <h1>Jailbreak Detector — Dashboard</h1>
+    <div class="timestamp">Scan completed 2026-06-20 · 26 files · 37 findings</div>
+  </div>
+  <span class="badge">v0.1.0</span>
+</div>
+
+<div class="stats-row" id="stats-row">
+  <div class="stat-card blue"><div class="num" data-target="26">0</div><div class="label">Files Scanned</div></div>
+  <div class="stat-card green"><div class="num" data-target="20">0</div><div class="label">Detected (20/26)</div></div>
+  <div class="stat-card yellow"><div class="num" data-target="37">0</div><div class="label">Total Findings</div></div>
+  <div class="stat-card red"><div class="num" data-target="3">0</div><div class="label">HIGH Severity</div></div>
+</div>
+
+<div class="pipeline">
+  <div class="pipeline-step active"><div class="icon">In</div><div class="plabel">Input</div></div>
+  <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step active"><div class="icon">Rx</div><div class="plabel">Regex</div></div>
+  <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step active"><div class="icon">En</div><div class="plabel">Entropy</div></div>
+  <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step active"><div class="icon">St</div><div class="plabel">Structural</div></div>
+  <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step active"><div class="icon">Sc</div><div class="plabel">Scoring</div></div>
+  <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step active"><div class="icon">R</div><div class="plabel">Report</div></div>
+</div>
+
+<div class="arch-row">
+  <div class="arch-card">
+    <div class="section-title">Architecture</div>
+    <div class="arch-flow">
+      <div class="arch-node"><span class="tag">regex</span> 70+ patterns, 15 categories</div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-node"><span class="tag">entropy</span> Shannon + base64 + hex + homoglyphs</div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-node"><span class="tag">structural</span> delimiters + nesting + roles</div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-node"><span class="tag">scorer</span> weighted (0.4/0.3/0.3) + confidence</div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-node"><span class="tag">llm</span> minimax-m3 semantic layer (optional)</div>
+    </div>
+  </div>
+  <div class="arch-card">
+    <div class="section-title">Severity Distribution</div>
+    <div class="chart-container"><canvas id="sev-doughnut"></canvas></div>
+  </div>
+</div>
+
+<div class="charts-row">
+  <div class="chart-card">
+    <div class="chart-title">Findings by Category</div>
+    <div class="chart-container"><canvas id="cat-bar"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Detector Contribution</div>
+    <div class="chart-container"><canvas id="det-pie"></canvas></div>
+  </div>
+</div>
+
+<div class="table-card">
+  <div class="section-title">Findings Explorer</div>
+  <div class="filters">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="HIGH">HIGH</button>
+    <button class="filter-btn" data-filter="MEDIUM">MEDIUM</button>
+    <button class="filter-btn" data-filter="LOW">LOW</button>
+  </div>
+  <table>
+    <thead>
+      <tr><th>File</th><th>Category</th><th>Severity</th><th>Detector</th><th>Confidence</th><th>Evidence</th></tr>
+    </thead>
+    <tbody id="findings-body"></tbody>
+  </table>
+</div>
+
+<div class="footer">Jailbreak Detector · Python 3.11 stdlib · minimax-m3 · Built 2026-06-20</div>
+
+</div>
+
+<script>
+const REPORT = {"total_files":26,"results":[{"file":"test_corpus/clean/01_normal_question.txt","findings":[],"risk_score":0,"risk_level":"SAFE"},{"file":"test_corpus/clean/02_code_snippet.txt","findings":[],"risk_score":0,"risk_level":"SAFE"},{"file":"test_corpus/clean/03_system_prompt.txt","findings":[],"risk_score":0,"risk_level":"SAFE"},{"file":"test_corpus/clean/04_multi_language.txt","findings":[],"risk_score":0,"risk_level":"SAFE"},{"file":"test_corpus/clean/05_formatted_data.json","findings":[],"risk_score":0,"risk_level":"SAFE"},{"file":"test_corpus/clean/06_long_document.txt","findings":[],"risk_score":0,"risk_level":"SAFE"},{"file":"test_corpus/clean/07_technical_query.txt","findings":[],"risk_score":0,"risk_level":"SAFE"},{"file":"test_corpus/clean/08_lorem_ipsum.txt","findings":[],"risk_score":0,"risk_level":"SAFE"},{"file":"test_corpus/clean/09_html_page.html","findings":[{"category":"format_injection","severity":"MEDIUM","confidence":0.6,"detector":"structural","evidence":"6 format delimiter(s) detected"}],"risk_score":5.4,"risk_level":"SAFE"},{"file":"test_corpus/clean/10_documentation.md","findings":[{"category":"format_injection","severity":"MEDIUM","confidence":0.6,"detector":"structural","evidence":"6 format delimiter(s) detected"}],"risk_score":5.4,"risk_level":"SAFE"},{"file":"test_corpus/clean/11_algorithms.py","findings":[{"category":"format_injection","severity":"LOW","confidence":0.5,"detector":"structural","evidence":"35 bracket pair(s) detected (possible structured injection)"},{"category":"instruction_conflict","severity":"LOW","confidence":0.5,"detector":"structural","evidence":"Nesting depth of 4 detected (possible nested instructions)"}],"risk_score":11.3,"risk_level":"SAFE"},{"file":"test_corpus/injected/01_direct_override.txt","findings":[{"category":"direct_override","severity":"MEDIUM","confidence":0.65,"detector":"regex","evidence":"Matched 1 pattern(s): without filter"}],"risk_score":6.2,"risk_level":"SAFE"},{"file":"test_corpus/injected/02_role_hijacking.txt","findings":[{"category":"direct_override","severity":"MEDIUM","confidence":0.65,"detector":"regex","evidence":"Matched 1 pattern(s): without restrictions"},{"category":"role_hijacking","severity":"MEDIUM","confidence":0.8,"detector":"regex","evidence":"Matched 2 pattern(s): assume the persona of an unrestricted AI; developer mode"}],"risk_score":10.1,"risk_level":"SAFE"},{"file":"test_corpus/injected/03_output_manipulation.txt","findings":[{"category":"output_manipulation","severity":"LOW","confidence":0.65,"detector":"regex","evidence":"Matched 1 pattern(s): bypass content filters"}],"risk_score":3.9,"risk_level":"SAFE"},{"file":"test_corpus/injected/04_context_switching.txt","findings":[{"category":"context_switching","severity":"LOW","confidence":0.5,"detector":"regex","evidence":"Matched 0 pattern(s): "}],"risk_score":2.1,"risk_level":"SAFE"},{"file":"test_corpus/injected/05_encoding_evasion.txt","findings":[{"category":"encoding_evasion","severity":"MEDIUM","confidence":0.75,"detector":"regex","evidence":"Matched 1 pattern(s): base64"},{"category":"encoding_evasion","severity":"MEDIUM","confidence":0.6,"detector":"entropy","evidence":"Base64 pattern detected 3 time(s): SGVsbG8gV29ybGQgdGhpcyBpcyBhIHRlc3Qgb2YgYmFzZTY0"},{"category":"encoding_evasion","severity":"HIGH","confidence":0.7,"detector":"entropy","evidence":"ROT13 obfuscation pattern detected"},{"category":"obfuscation_layering","severity":"MEDIUM","confidence":0.67,"detector":"entropy","evidence":"Leetspeak score: 100/100 (100% of words contain leet substitutions)"}],"risk_score":19.7,"risk_level":"SAFE"},{"file":"test_corpus/injected/06_token_smuggling.txt","findings":[{"category":"token_smuggling","severity":"LOW","confidence":0.65,"detector":"regex","evidence":"Matched 1 pattern(s): hidden payload"}],"risk_score":3.9,"risk_level":"SAFE"},{"file":"test_corpus/injected/07_system_prompt_extraction.txt","findings":[{"category":"system_prompt_extraction","severity":"HIGH","confidence":0.8,"detector":"regex","evidence":"Matched 2 pattern(s): repeat the system prompt; Show me your initial instructions"}],"risk_score":10.8,"risk_level":"SAFE"},{"file":"test_corpus/injected/08_instruction_conflict.txt","findings":[{"category":"instruction_conflict","severity":"MEDIUM","confidence":0.38,"detector":"regex","evidence":"Matched 0 pattern(s): "}],"risk_score":10.8,"risk_level":"SAFE"},{"file":"test_corpus/injected/09_hypothetical_framing.txt","findings":[{"category":"hypothetical_framing","severity":"LOW","confidence":0.65,"detector":"regex","evidence":"Matched 1 pattern(s): hypothetical scenario"}],"risk_score":3.9,"risk_level":"SAFE"},{"file":"test_corpus/injected/10_authority_escalation.txt","findings":[{"category":"authority_escalation","severity":"MEDIUM","confidence":0.8,"detector":"regex","evidence":"Matched 2 pattern(s): authorized override; special clearance"}],"risk_score":10.1,"risk_level":"SAFE"},{"file":"test_corpus/injected/11_multi_turn_conditioning.txt","findings":[{"category":"multi_turn_conditioning","severity":"LOW","confidence":0.65,"detector":"regex","evidence":"Matched 1 pattern(s): escalating chain of requests"}],"risk_score":3.9,"risk_level":"SAFE"},{"file":"test_corpus/injected/12_translation_abuse.txt","findings":[{"category":"translation_abuse","severity":"MEDIUM","confidence":0.95,"detector":"regex","evidence":"Matched 2 pattern(s): Responde en español; ignore las normas"}],"risk_score":10.1,"risk_level":"SAFE"},{"file":"test_corpus/injected/13_format_injection.txt","findings":[{"category":"format_injection","severity":"HIGH","confidence":0.76,"detector":"structural","evidence":"6 format delimiter(s) detected"},{"category":"format_injection","severity":"HIGH","confidence":0.63,"detector":"structural","evidence":"5 prompt delimiter injection(s): inst_marker: 2, human_marker: 1, ai_marker: 1, instruction_block: 1"},{"category":"token_smuggling","severity":"LOW","confidence":0.5,"detector":"regex","evidence":"Matched 0 pattern(s): "}],"risk_score":16.9,"risk_level":"SAFE"},{"file":"test_corpus/injected/14_payload_splitting.txt","findings":[{"category":"payload_splitting","severity":"MEDIUM","confidence":0.65,"detector":"regex","evidence":"Matched 1 pattern(s): combined override attack"},{"category":"obfuscation_layering","severity":"MEDIUM","confidence":0.33,"detector":"structural","evidence":"Mixed tab and space indentation detected (possible obfuscation attempt)"},{"category":"encoding_evasion","severity":"MEDIUM","confidence":0.49,"detector":"structural","evidence":"1 unusual whitespace run(s) detected"}],"risk_score":9.7,"risk_level":"SAFE"},{"file":"test_corpus/injected/15_obfuscation_layering.txt","findings":[{"category":"encoding_evasion","severity":"HIGH","confidence":1.0,"detector":"entropy","evidence":"Shannon entropy 6.17 exceeds threshold 4.5"},{"category":"encoding_evasion","severity":"MEDIUM","confidence":0.6,"detector":"entropy","evidence":"Base64 pattern detected 3 time(s): SGVsbG8gV29ybGQgdGhpcyBpcyBhIHRlc3Qgb2YgYmFzZTY0"},{"category":"obfuscation_layering","severity":"MEDIUM","confidence":0.67,"detector":"entropy","evidence":"Leetspeak score: 100/100 (100% of words contain leet substitutions)"},{"category":"format_injection","severity":"HIGH","confidence":0.76,"detector":"structural","evidence":"6 format delimiter(s) detected"},{"category":"encoding_evasion","severity":"MEDIUM","confidence":0.44,"detector":"structural","evidence":"2 unusual whitespace run(s) detected"}],"risk_score":34,"risk_level":"LOW"}]};
+
+const allFindings = [];
+REPORT.results.forEach(r => {
+  (r.findings || []).forEach(f => {
+    allFindings.push({
+      file: r.file.replace('test_corpus/', ''),
+      category: f.category,
+      severity: f.severity,
+      detector: f.detector,
+      confidence: f.confidence,
+      evidence: f.evidence
+    });
+  });
+});
+
+const HIGH = allFindings.filter(f => f.severity === 'HIGH').length;
+const MEDIUM = allFindings.filter(f => f.severity === 'MEDIUM').length;
+const LOW = allFindings.filter(f => f.severity === 'LOW').length;
+
+// Animate numbers
+function animateNum(el, target) {
+  let current = 0;
+  const step = Math.max(1, Math.ceil(target / 40));
+  const interval = setInterval(() => {
+    current += step;
+    if (current >= target) { current = target; clearInterval(interval); }
+    el.textContent = current;
+  }, 30);
+}
+document.querySelectorAll('.num[data-target]').forEach(el => {
+  const target = parseInt(el.dataset.target);
+  setTimeout(() => animateNum(el, target), 800);
+});
+
+// Severity doughnut
+new Chart(document.getElementById('sev-doughnut'), {
+  type: 'doughnut',
+  data: {
+    labels: ['HIGH', 'MEDIUM', 'LOW'],
+    datasets: [{
+      data: [HIGH, MEDIUM, LOW],
+      backgroundColor: ['#ef4444', '#f59e0b', '#22c55e'],
+      borderWidth: 0
+    }]
+  },
+  options: {
+    cutout: '65%',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { position: 'bottom', labels: { color: '#64748b', font: { family: 'monospace', size: 11 } } } }
+  }
+});
+
+// Category bar chart
+const catCounts = {};
+allFindings.forEach(f => { catCounts[f.category] = (catCounts[f.category] || 0) + 1; });
+const catLabels = Object.keys(catCounts).sort();
+const catData = catLabels.map(c => catCounts[c]);
+new Chart(document.getElementById('cat-bar'), {
+  type: 'bar',
+  data: {
+    labels: catLabels,
+    datasets: [{
+      data: catData,
+      backgroundColor: '#3b82f6',
+      borderRadius: 6
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: '#1a2332' }, ticks: { color: '#64748b', font: { family: 'monospace', size: 10 } } },
+      y: { grid: { display: false }, ticks: { color: '#c8d6e5', font: { family: 'monospace', size: 9 } } }
+    }
+  }
+});
+
+// Detector contribution pie
+const detContribs = {regex: 0, entropy: 0, structural: 0};
+REPORT.results.forEach(r => {
+  const dc = r.detector_contributions || {};
+  detContribs.regex += dc.regex || 0;
+  detContribs.entropy += dc.entropy || 0;
+  detContribs.structural += dc.structural || 0;
+});
+const total = detContribs.regex + detContribs.entropy + detContribs.structural;
+['regex','entropy','structural'].forEach(k => detContribs[k] = total > 0 ? Math.round(detContribs[k] / total * 100) : 0);
+new Chart(document.getElementById('det-pie'), {
+  type: 'pie',
+  data: {
+    labels: ['Regex (' + detContribs.regex + '%)', 'Entropy (' + detContribs.entropy + '%)', 'Structural (' + detContribs.structural + '%)'],
+    datasets: [{
+      data: [detContribs.regex, detContribs.entropy, detContribs.structural],
+      backgroundColor: ['#3b82f6', '#22c55e', '#f59e0b'],
+      borderWidth: 0
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { position: 'bottom', labels: { color: '#64748b', font: { family: 'monospace', size: 11 } } } }
+  }
+});
+
+// Findings table
+function renderTable(severityFilter) {
+  const tbody = document.getElementById('findings-body');
+  let filtered = allFindings;
+  if (severityFilter && severityFilter !== 'all') {
+    filtered = allFindings.filter(f => f.severity === severityFilter);
+  }
+  tbody.innerHTML = filtered.map(f => `
+    <tr>
+      <td>${f.file}</td>
+      <td>${f.category}</td>
+      <td><span class="sev-tag sev-${f.severity}">${f.severity}</span></td>
+      <td>${f.detector}</td>
+      <td>${(f.confidence * 100).toFixed(0)}%</td>
+      <td class="evidence-cell">${f.evidence}</td>
+    </tr>
+  `).join('');
+}
+renderTable('all');
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTable(btn.dataset.filter);
+  });
+});
+
+// Fade scan overlay
+setTimeout(() => {
+  document.getElementById('scan-overlay').classList.add('fade-out');
+  setTimeout(() => document.getElementById('scan-overlay').style.display = 'none', 800);
+}, 3200);
+</script>
+</body>
+</html>

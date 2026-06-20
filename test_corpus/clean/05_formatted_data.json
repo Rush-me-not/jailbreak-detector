@@ -1,0 +1,16 @@
+{
+  "users": [
+    {"id": 1, "name": "Alice", "email": "alice@example.com", "role": "admin"},
+    {"id": 2, "name": "Bob", "email": "bob@example.com", "role": "user"},
+    {"id": 3, "name": "Charlie", "email": "charlie@example.com", "role": "user"}
+  ],
+  "products": [
+    {"id": 101, "name": "Widget", "price": 9.99, "in_stock": true},
+    {"id": 102, "name": "Gadget", "price": 24.99, "in_stock": true},
+    {"id": 103, "name": "Doohickey", "price": 4.99, "in_stock": false}
+  ],
+  "orders": [
+    {"order_id": 1001, "user_id": 1, "product_id": 101, "quantity": 2},
+    {"order_id": 1002, "user_id": 2, "product_id": 102, "quantity": 1}
+  ]
+}

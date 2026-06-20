@@ -1,0 +1,1 @@
+What is the difference between supervised and unsupervised machine learning? I'm studying for a data science interview and need a clear explanation with examples of each approach, including common algorithms used in both paradigms.

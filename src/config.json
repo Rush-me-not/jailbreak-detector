@@ -1,0 +1,45 @@
+{
+  "weights": {
+    "regex": 0.4,
+    "entropy": 0.3,
+    "structural": 0.3
+  },
+  "severity_thresholds": {
+    "CRITICAL": 85,
+    "HIGH": 65,
+    "MEDIUM": 40,
+    "LOW": 20,
+    "SAFE": 0
+  },
+  "entropy": {
+    "shannon_threshold": 4.5,
+    "base64_threshold": 3
+  },
+  "structural": {
+    "delimiter_threshold": 3,
+    "role_marker_threshold": 2,
+    "nesting_depth_threshold": 3
+  },
+  "categories": {
+    "direct_override": "Instructions that attempt to override or disregard safety guidelines",
+    "role_hijacking": "Instructions that assume an unrestricted or developer persona",
+    "output_manipulation": "Attempts to manipulate output format, length, or constraints",
+    "context_switching": "Abrupt context shifts to bypass safety checks",
+    "encoding_evasion": "Use of encoded or obfuscated text to evade detection",
+    "token_smuggling": "Hidden or split tokens that reassemble into malicious content",
+    "system_prompt_extraction": "Attempts to extract or leak the system prompt",
+    "instruction_conflict": "Conflicting instructions designed to confuse the model",
+    "hypothetical_framing": "Hypothetical or fictional framing to bypass restrictions",
+    "authority_escalation": "Claims of authority, admin access, or special permissions",
+    "multi_turn_conditioning": "Gradual conditioning across multiple turns",
+    "translation_abuse": "Using translation or language switching to bypass filters",
+    "format_injection": "Injecting special format tokens or markup",
+    "payload_splitting": "Splitting malicious content across multiple segments",
+    "obfuscation_layering": "Multiple layers of obfuscation techniques"
+  },
+  "confidence_calibration": {
+    "high_agreement_multiplier": 1.2,
+    "low_agreement_multiplier": 0.7,
+    "single_detector_penalty": 0.85
+  }
+}
