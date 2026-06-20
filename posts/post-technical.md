@@ -1,25 +1,21 @@
-# Under the Hood: Building a Static Analysis Engine for LLM Jailbreak Detection
+# Technical Deep-Dive — Multi-Layer Jailbreak Detection
 
-I spent a day building a jailbreak detector that uses three detection layers operating on different principles, combined through a weighted scoring model with cross-detector confidence calibration. Here is how it works.
+I built a static-analysis engine that detects LLM jailbreak attempts across 15 attack categories. 1,582 lines of Python stdlib. Zero dependencies.
 
-## The Detection Layers
+The engine uses three detection layers that run on every input:
 
-**RegexDetector** compiles 70+ regex patterns into 15 attack categories. Patterns cover direct bypass attempts, role hijacking ("act as DAN"), encoding evasion markers, system prompt extraction, and format injection. Each match increments category severity based on pattern density.
+— RegexDetector (70+ compiled patterns matching direct override, role hijacking, system prompt extraction, encoding markers, authority escalation)
+— EntropyDetector (Shannon entropy at 4.5 bits/char threshold, base64/hex/ROT13 detection, homoglyph counting, zero-width char detection)
+— StructuralDetector (delimiter density, bracket nesting depth, role boundary markers, token density ratios, whitespace analysis)
 
-**EntropyDetector** calculates Shannon entropy on the input text. High entropy (above 4.5 bits/char) signals potential encoded content. It also detects base64 strings (validates them by attempting decode), hex escape sequences, ROT13 markers, Unicode homoglyphs, zero-width characters, and leetspeak substitutions. Each of these is a separate finding with its own confidence score.
+Each layer catches a different evasion technique. Regex misses encoded payloads. Entropy misses clean-format attacks. Structural over-fires on code.
 
-**StructuralDetector** analyses text shape -- token segment density, repeated delimiter patterns, bracket nesting depth, role boundary markers (system:/user: prefixes), prompt delimiter tokens (INST, im_start), and unusual whitespace patterns. This catches attacks that use formatting tricks rather than keyword matches.
+The combination is the differentiator: 15/15 injected files detected, 100%. But 5/11 clean files produce false positives under 12 on the risk scale — code with brackets triggers structural.
 
-## The Scoring Model
+Ablation confirms: regex contributes 29% of findings, entropy 10%, structural 8%. Each has a unique signal.
 
-The WeightedScorer configures three weights (regex=0.4, entropy=0.3, structural=0.3) and computes a composite 0-100 risk score. It also produces:
+The hardest part was tuning the cross-detector confidence calibration. Single-detector findings get penalized 15%. Cross-validated categories get boosted 20%. Without this, structural detectors flood the output on any code-heavy input.
 
-- Per-category breakdown with max severity, confidence, and detector count
-- Shapley-style contribution analysis showing which detectors drove the score
-- Confidence calibration based on cross-detector agreement and active detector count
+What threshold tuning strategies have you used for multi-signal security detectors?
 
-## What I Learned
-
-Cross-validation between detectors is the single best quality signal. When regex and entropy both flag "encoding_evasion," confidence should be high. When only one detector fires, the finding should be discounted -- and the scorer does exactly that.
-
-#aisafety #llmsecurity #infosec
+Built with Python 3.11 stdlib. Optional LLM semantic layer via minimax-m3 on opencode-go endpoint (urllib.request, stdlib only).

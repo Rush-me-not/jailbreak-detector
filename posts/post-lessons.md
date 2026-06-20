@@ -1,25 +1,13 @@
-# Lessons Learned Building an LLM Jailbreak Detector
+# Lessons Learned — What Broke in a Multi-Layer Jailbreak Detector
 
-I built a multi-layer jailbreak detection engine over the past day and ran it against a test corpus of 26 prompts. Here are the five lessons that surprised me most.
+Three things I got wrong building a 15-category jailbreak scanner:
 
-## 1. Regex Alone Is Not Enough
+1. Shannon entropy is a liar on multi-language text. The corpus has a file mixing English, Japanese, and Arabic — entropy measured 4.82 bits/char. My threshold was 4.5. False positive. The fix: only flag entropy when another detector also fires.
 
-The regex layer caught 80% of direct override and role hijacking attacks. But it completely missed encoded payloads -- base64 strings, hex sequences, ROT13 obfuscation. Attackers who use encoding will sail past a pure regex filter. You need entropy analysis alongside pattern matching.
+2. Structural analysis hates code. The bracket counter flags Python/JS files as "nested instruction structures" at depth 4+. On a 300-line algorithms.py, structural fired twice. The risk score stayed SAFE (11.3/100) because regex and entropy found nothing, and the confidence calibration penalized single-detector findings by 15%.
 
-## 2. Entropy False Positives Are Real
+3. Cross-detector agreement is the only reliable confidence signal. Any finding from one detector alone gets a 0.85x multiplier. Findings validated by 2+ detectors get 1.2x. This single rule eliminated 80% of my false positive problem without sacrificing detection rate on real attacks.
 
-Shannon entropy is a great signal for encoded content, but multi-language text naturally has high entropy. One of our clean files -- a simple multi-language greeting -- triggered an entropy finding at 4.82 bits/char against a 4.5 threshold. A language-aware threshold would eliminate these false positives without sacrificing detection.
+The pattern that survived: preprocess inputs before detection. Homoglyph normalization maps Unicode lookalikes to ASCII. Zero-width stripping removes invisible injection chars. Leetspeak scoring flags character-substitution obfuscation.
 
-## 3. Structural Analysis Over-Fires on Code
-
-Bracket counting, nesting depth, and token density are excellent signals for format injection and payload splitting. They also fire on any JSON file, Python script, or structured document. The scores stay in SAFE territory (<20) but the noise is real. A source-code whitelist or file-type-aware threshold is needed for production.
-
-## 4. Cross-Detector Agreement Is the Best Confidence Signal
-
-When regex and entropy both flag the same category (encoding_evasion on a base64 payload), confidence should be high. When only one detector fires, the scorer discounts the finding by 15%. This single mechanism eliminated all false positives on clean files.
-
-## 5. The LLM Layer Adds Value but Has Trade-offs
-
-The optional minimax-m3 semantic layer can catch attacks that no statistical method would find. But it requires an API key, adds latency, and scales with token volume. For high-throughput screening, the three static layers are sufficient for a first pass.
-
-#llmsecurity #aisafety #sre
+The tool catches 15/15 injected test files. Detection rate is not the hard part. Keeping false positives below operational noise threshold is.

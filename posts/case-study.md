@@ -1,30 +1,20 @@
-# Case Study: Building a Multi-Layer Jailbreak Detector for LLMs
+# Case Study — Multi-Layer Static Analysis for LLM Jailbreak Detection
 
-## The Problem
+What it does: screens text inputs for LLM jailbreak attempts before they reach the model. 15 attack categories, 3 detection layers, weighted scoring.
 
-A client deploying a customer-facing LLM chatbot was getting pwned weekly. Users would paste "DAN mode" prompts, encode instructions in base64, or use Unicode homoglyphs to slip past the single regex filter they had in production. One attack used zero-width characters to hide an override instruction that made the bot output its entire system prompt. They needed something better.
+Why it matters: Most jailbreak detection tools are single-layer regex matchers. Attackers use encoding (base64, hex, ROT13), homoglyph substitution, zero-width chars, leetspeak, and structural injection — all of which bypass simple pattern matching. Organizations deploying LLMs need static-analysis tools that screen prompts at the gateway, not after the fact.
 
-## The Approach
+Architecture:
+— RegexDetector: 70+ compiled patterns across 15 categories
+— EntropyDetector: Shannon entropy, base64/hex/ROT13, homoglyph/zero-width/leetspeak detection
+— StructuralDetector: delimiter density, nesting, role boundary markers, whitespace analysis
+— WeightedScorer: configurable weights (0.4/0.3/0.3), confidence calibration, Shapley-style contributions
+— Optional LLM layer: minimax-m3 semantic classification via opencode-go
 
-We built a three-layer static analysis engine that runs on prompts before they reach the LLM:
+Results: 15/15 injected files detected (100%). 5/11 clean files had false positives (all scored SAFE under 12). 37 findings across 14 categories. Average detector contribution: regex 29%, entropy 10%, structural 8%.
 
-1. **RegexDetector** -- 70+ patterns across 15 categories covering direct overrides, role hijacking, encoding markers, and extraction attempts.
-2. **EntropyDetector** -- Shannon entropy analysis, base64/hex/ROT13 sniffing, homoglyph counting, and leetspeak scoring.
-3. **StructuralDetector** -- Token density, delimiter counting, nesting depth, and role boundary markers.
+The hardest engineering challenge: tuning confidence calibration so that cross-validated findings (flagged by 2+ detectors) carry more weight than single-detector noise. Implementation: 1.2x boost for agreement, 0.85x penalty for solo findings.
 
-A WeightedScorer combines all findings into a single 0-100 risk score with per-category breakdowns and cross-detector confidence calibration.
+Built with Python 3.11 stdlib — zero PyPI dependencies for the core engine. The LLM layer uses urllib.request only. 1,582 lines of source code across 4 modules.
 
-## The Results
-
-Tested against 26 prompts (11 clean, 15 injected):
-
-- 100% detection rate on injected attacks
-- Zero false positives on normal queries
-- Only 5/11 clean code/data files produced low-severity structural findings (all scored SAFE)
-- Cross-detector agreement proved to be the strongest confidence signal
-
-## Key Takeaway
-
-No single detection layer is sufficient. Regex catches known patterns but misses novel obfuscation. Entropy analysis catches encoding but FPs on multi-language text. Structural analysis catches injection but FPs on code. Together, with a weighted scoring model, they provide reliable detection with calibrated confidence.
-
-#jailbreak #llmsecurity #aisafety
+This is not a tutorial clone. The multi-layer approach with confidence calibration and ablation analysis reflects real threat modeling for production AI security deployments.

@@ -1,4 +1,13 @@
+posts/
+publish/
+case-study.md
+post-*.md
 __pycache__/
-.pytest_cache/
 *.pyc
-report.json
+.ruff_cache/
+.pytest_cache/
+src/.pens_key
+src/.rag_audit_key
+*.egg-info/
+dist/
+build/
